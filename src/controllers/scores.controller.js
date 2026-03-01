@@ -129,19 +129,25 @@ const postScore = async (req, res) => {
                 metadata.timestamp || '',
                 highScores?.TIME_BOUND?.score || 0,
                 highScores?.TIME_BOUND?.scoredBy || '',
+                highScores?.TIME_BOUND?.highScoreId || '',
                 highScores?.TIME_BOUND?.sessionId || '',
+                highScores?.TIME_BOUND?.timestamp || "null",
                 highScores?.ENDLESS?.score || 0,
                 highScores?.ENDLESS?.scoredBy || '',
+                highScores?.ENDLESS?.highScoreId || '',
                 highScores?.ENDLESS?.sessionId || '',
+                highScores?.ENDLESS?.timestamp || "null",
                 highScores?.CLASSIC?.score || 0,
                 highScores?.CLASSIC?.scoredBy || '',
-                highScores?.CLASSIC?.sessionId || ''
+                highScores?.CLASSIC?.highScoreId || '',
+                highScores?.CLASSIC?.sessionId || '',
+                highScores?.CLASSIC?.timestamp || "null",
             ];
 
             if (pmRowIndex !== -1) {
-                await updateSheetData(`PlayerMasterData!A${pmRowIndex}:M${pmRowIndex}`, [pmRow]);
+                await updateSheetData(`PlayerMasterData!A${pmRowIndex}:S${pmRowIndex}`, [pmRow]);
             } else {
-                await appendSheetData('PlayerMasterData!A:M', [pmRow]);
+                await appendSheetData('PlayerMasterData!A:S', [pmRow]);
             }
         }
 
