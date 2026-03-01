@@ -1,0 +1,19 @@
+meta {
+  name: getPepper
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{protocol}}{{host}}:{{port}}/api/system/pepper?version=v0
+  body: none
+  auth: inherit
+}
+
+params:query {
+  version: v0
+}
+
+headers {
+  Authorization: {{token}}
+}

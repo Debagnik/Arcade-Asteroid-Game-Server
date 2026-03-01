@@ -1,0 +1,17 @@
+meta {
+  name: Authorization server
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{protocol}}{{host}}:{{port}}/api/auth
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  let data = res.getBody();
+  
+  bru.setEnvVar("token", "Bearer " + data.token);
+}
