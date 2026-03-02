@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const lzma = require('lzma-native');
-const { XOR_KEY, SALT, SIGNATURE_SEPARATOR } = require('../config/constants');
+const { XOR_KEY, SALT, SIGNATURE_SEPARATOR, MAX_DECOMPRESSED_BYTES } = require('../config/constants');
 
 /**
  * Verifies and decodes the gameScore payload based on the agreed pipeline:
@@ -53,7 +53,28 @@ const decodeAndVerifyScore = async (fullPayload, customXorKey = XOR_KEY) => {
     // Step 7: Decompress (XZ / LZMA2)
     let jsonString;
     try {
-        const decompressedBuffer = await lzma.decompress(compressedBytes);
+        const decompressedBuffer = await new Promise((resolve, reject) => {
+            // Set memlimit so dictionary allocation won't blow up system
+            const decompressor = lzma.createDecompressor({ memlimit: MAX_DECOMPRESSED_BYTES });
+            const chunks = [];
+            let totalSize = 0;
+
+            decompressor.on('data', (chunk) => {
+                totalSize += chunk.length;
+                if (totalSize > MAX_DECOMPRESSED_BYTES) {
+                    const err = new Error('Payload exceeds maximum decompressed size (zip bomb protection).');
+                    decompressor.destroy(err);
+                    reject(err);
+                } else {
+                    chunks.push(chunk);
+                }
+            });
+
+            decompressor.on('error', (err) => reject(err));
+            decompressor.on('end', () => resolve(Buffer.concat(chunks)));
+
+            decompressor.end(compressedBytes);
+        });
         jsonString = decompressedBuffer.toString('utf-8');
     } catch (err) {
         throw new Error('Failed to decompress LZMA2 payload: ' + err.message);
