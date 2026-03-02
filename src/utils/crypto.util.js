@@ -54,8 +54,7 @@ const decodeAndVerifyScore = async (fullPayload, customXorKey = XOR_KEY) => {
     let jsonString;
     try {
         const decompressedBuffer = await new Promise((resolve, reject) => {
-            // Set memlimit so dictionary allocation won't blow up system
-            const decompressor = lzma.createDecompressor({ memlimit: MAX_DECOMPRESSED_BYTES });
+            const decompressor = lzma.createDecompressor();
             const chunks = [];
             let totalSize = 0;
 
