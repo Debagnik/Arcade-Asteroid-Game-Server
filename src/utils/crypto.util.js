@@ -1,65 +1,69 @@
 const crypto = require('crypto');
+const lzma = require('lzma-native');
 const { XOR_KEY, SALT, SIGNATURE_SEPARATOR } = require('../config/constants');
 
 /**
  * Verifies and decodes the gameScore payload based on the agreed pipeline:
- * JSON -> Base64 -> Salt -> XOR -> Base64 + Separator + SHA256 Signature
+ * LZMA2 -> Base64 -> Salt -> XOR -> Base64 + Separator + SHA256 Signature
  * 
  * @param {string} fullPayload The raw string from the request body
- * @returns {object} The parsed JSON object
+ * @param {string} customXorKey Optional. Defaults to project XOR_KEY. Used for pepper logic.
+ * @returns {Promise<object>} The parsed JSON object
  * @throws {Error} If signature is invalid or decoding fails
  */
-const decodeAndVerifyScore = (fullPayload) => {
+const decodeAndVerifyScore = async (fullPayload, customXorKey = XOR_KEY) => {
     if (!fullPayload || typeof fullPayload !== 'string') {
         throw new Error('Invalid payload format.');
     }
 
+    // Step 1: Split Checksum and Payload
     const parts = fullPayload.split(SIGNATURE_SEPARATOR);
     if (parts.length !== 2) {
         throw new Error('Payload does not contain the expected signature separator.');
     }
 
-    const encodedData = parts[0];
-    const signature = parts[1];
+    const protectedData = parts[0];
+    const providedChecksum = parts[1];
 
-    // 1. Verify SHA-256 Checksum Signature (No HMAC, just regular SHA256 hash of the encoded data)
-    const hash = crypto.createHash('sha256').update(encodedData).digest('hex');
-    if (hash !== signature) {
+    // Step 2: Verify Checksum (SHA-256)
+    const hash = crypto.createHash('sha256').update(protectedData).digest('hex');
+    if (hash !== providedChecksum.toLowerCase()) {
         throw new Error('Signature verification failed! Payload may have been tampered with.');
     }
 
-    // 2. Second Base64 Decode (Base64 -> XORed bytes)
-    const xorMaskedBuf = Buffer.from(encodedData, 'base64');
+    // Step 3: Base64 Decode (Outer Layer)
+    const xoredBytes = Buffer.from(protectedData, 'base64');
 
-    // 3. XOR Unmasking
-    let xoredString = '';
-    const xorKeyBuf = Buffer.from(XOR_KEY, 'utf-8');
-    for (let i = 0; i < xorMaskedBuf.length; i++) {
-        // We assume XOR_KEY was applied cyclically to the bytes
-        xoredString += String.fromCharCode(xorMaskedBuf[i] ^ xorKeyBuf[i % xorKeyBuf.length]);
+    // Step 4: Undo XOR Masking
+    let saltedBase64String = '';
+    const xorKeyBuf = Buffer.from(customXorKey, 'utf-8');
+    for (let i = 0; i < xoredBytes.length; i++) {
+        saltedBase64String += String.fromCharCode(xoredBytes[i] ^ xorKeyBuf[i % xorKeyBuf.length]);
     }
 
-    // 4. Remove Salt Addition
-    // Assuming salt was appended (`string + SALT`)
-    let firstBase64String = xoredString;
-    if (xoredString.endsWith(SALT)) {
-        firstBase64String = xoredString.slice(0, -SALT.length);
-    } else {
-        // Could also try to replace if it was injected differently, but standard "salt addition" 
-        // implies append or prepend. Let's strictly attempt to remove trailing or leading.
-        if (xoredString.startsWith(SALT)) {
-            firstBase64String = xoredString.slice(SALT.length);
-        }
+    // Step 5: Verify and Strip Salt
+    if (!saltedBase64String.endsWith(SALT)) {
+        throw new Error('Salt verification failed. Payload is invalid or corrupted.');
+    }
+    const innerBase64String = saltedBase64String.slice(0, -SALT.length);
+
+    // Step 6: Base64 Decode (Inner Layer)
+    const compressedBytes = Buffer.from(innerBase64String, 'base64');
+
+    // Step 7: Decompress (XZ / LZMA2)
+    let jsonString;
+    try {
+        const decompressedBuffer = await lzma.decompress(compressedBytes);
+        jsonString = decompressedBuffer.toString('utf-8');
+    } catch (err) {
+        throw new Error('Failed to decompress LZMA2 payload: ' + err.message);
     }
 
-    // 5. First Base64 Decode
-    const jsonString = Buffer.from(firstBase64String, 'base64').toString('utf-8');
-
-    // 6. JSON Parse
+    // Step 8: Parse JSON
     try {
         return JSON.parse(jsonString);
     } catch (err) {
-        throw new Error('Failed to parse decoded payload as JSON.');
+        throw new Error('Failed to parse decompressed payload as JSON.');
     }
 };
 

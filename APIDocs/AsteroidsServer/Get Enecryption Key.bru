@@ -1,0 +1,21 @@
+meta {
+  name: Get Enecryption Key
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{URI}}/api/getEncryptionKey
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: {{token}}
+}
+
+body:json {
+  {
+    "publicKey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAgISA4ZUcuSJB/vzar/WV\n5zOxa4sVIusI/YQ9imxVV9U75v32NjJBym8ahYntvoX1bFrqEHKhvVjAcaV59eLJ\nqMeDa2JRCXqeUps1hsJ5vZ0WwUETQjMoi0ovdIjnvA5BjZHWcPtWN/ohDmE5894X\nsc7wXNktngjeODM2D71ML62pIbzvt7Ku/P3r9FX3eA9czcf4JPhhXJFKXbCnMBih\nVZqXBZiWUPprsofHAnjAieuPnaZ2cMJGmnaJg51KBS9ci0fCY/G73q+QOvKMDZxS\ncdyDEHtFHLLx5fvRdoxU8Rfjz3yYyh9u4vPCLHbsFLp7COVy1eSZkp9SpKCOttO/\n8wIDAQAB\n-----END PUBLIC KEY-----"
+  }
+}

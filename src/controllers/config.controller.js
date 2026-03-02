@@ -1,4 +1,5 @@
 const { getSheetData } = require('../services/googleSheets.service');
+const { getEncryptedAesKey } = require('../services/encryption.service');
 
 const getSystemPepper = async (req, res) => {
     try {
@@ -46,6 +47,23 @@ const getSystemPepper = async (req, res) => {
     }
 };
 
+const getClientEncryptionKey = async (req, res) => {
+    try {
+        const { publicKey } = req.body;
+
+        if (!publicKey || typeof publicKey !== 'string') {
+            return res.status(400).json({ error: 'Missing or invalid publicKey in request body.' });
+        }
+
+        const encryptedAesKey = getEncryptedAesKey(publicKey);
+        res.status(200).json({ encryptedAesKey });
+    } catch (error) {
+        console.error('Error serving encryption key:', error);
+        res.status(400).json({ error: error.message || 'Failed to generate encrypted AES key.' });
+    }
+};
+
 module.exports = {
-    getSystemPepper
+    getSystemPepper,
+    getClientEncryptionKey
 };

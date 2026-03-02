@@ -72,11 +72,48 @@ To allow the server to securely read and append data to Google Sheets, you must 
 - Protected route (Requires Bearer Token).
 - Fetches the system Pepper string assigned to the provided version on the `Config` sheet.
 
-### `POST /api/scores`
+### `POST /api/getEncryptionKey`
 - Protected route (Requires Bearer Token).
-- Expects: `{ "gameScore": "<signed payload>" }`.
-- Decrypts via XOR + Salt, verifies SHA256 signature, validates `sessionHistory` UUID signatures and physical constraints, maps negative scores to 0, and appends valid High Scores to the `GlobalScores` sheet.
+- Expects: `{ "publicKey": "<Client RSA Public Key (PEM)>" }`.
+- Returns: `{ "encryptedAesKey": "<Base64 string>" }`. The client uses their RSA Private Key to decrypt this value, retrieving the server's 32-byte AES-256 session key.
+
+### `POST /api/scores?version=v1`
+- Protected route (Requires Bearer Token).
+- Expects query param: `version` (optional, determines pepper string).
+- Expects body: 
+  ```json
+  {
+    "gameScore": "<encoded/encrypted payload>",
+    "isPeppered": true,
+    "isEncrypted": true
+  }
+  ```
+- **If `isEncrypted=true`**: Server decrypts `gameScore` using AES-256-CBC and updates all tracking sheets including `GlobalScores`.
+- **If `isEncrypted=false`**: Server does not decrypt AES, but decodes the payload, validates it, and updates `PlayerMasterData` and `sessionData` (skips `GlobalScores`).
+- Decodes via LZMA2, Base64, Salt, and XOR. Verifies SHA-256 integrity signatures and physical game constraints.
 
 ### `GET /api/leaderboard`
 - Protected route (Requires Bearer Token).
 - Reads `GlobalScores` sheet and returns the highest score globally for `TIME_BOUND`, `ENDLESS`, and `CLASSIC` modes, gracefully masking negative sheet numbers to 0.
+
+---
+
+## Client-Side Pipeline Specifications
+
+To correctly submit data to `/api/scores`, the client system must implement the following pipeline exactly.
+
+### 1. Encoding Pipeline (Before Encryption)
+1. **Compress**: Compress raw JSON string to bytes using LZMA2 (Preset 9 / Max).
+2. **Base64 Encode**: Encode compressed bytes to a base64 string.
+3. **Add Salt**: Append `SALT` ("privacy-apron-privacy-eternal-dominoes-approach") to the base64 string.
+4. **XOR Mask Config**: If using pepper, determine the `XOR_KEY` by appending the fetched pepper string to the base `XOR_KEY`. Otherwise, use the base `XOR_KEY`
+5. **XOR Mask**: Convert the salted string to bytes, and XOR each byte against the `XOR_KEY` recursively.
+6. **Base64 Encode**: Encode the XOR'd bytes to a base64 string (`protectedData`).
+7. **Sign & Assemble**: Calculate the SHA-256 hash of `protectedData` (lowercase hex). Append `CHECKSUM_SEPARATOR` and the hash to `protectedData`.
+
+### 2. Encryption Pipeline (Data Transmission)
+1. **Fetch Key**: Call `POST /api/getEncryptionKey` with the client's RSA Public Key and retrieve the Base64 RSA-encrypted AES key.
+2. **Decrypt Key**: Decrypt the received key using the client's RSA Private Key to obtain the raw 32-byte AES-256 key.
+3. **Encrypt Payload**: Generate a random 16-byte IV. Use AES-256-CBC to encrypt the assembled string from the Encoding Pipeline. Prepend the 16-byte IV to the ciphertext bytes.
+4. **Base64 Encode Encrypted Payload**: Encode the concatenated `[IV + CipherText]` to a Base64 string.
+5. **Send Data**: Assign the resulting Base64 string to `gameScore` in the request body. Set `isEncrypted: true` and `isPeppered: true` (if pepper was used) and `version` query parameter. Retry up to 5 times if the server does not respond with status 201.

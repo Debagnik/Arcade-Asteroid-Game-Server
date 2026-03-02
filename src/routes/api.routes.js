@@ -12,6 +12,7 @@ router.post('/auth', authController.generateToken);
 
 // Protected routes
 router.use(authMiddleware);
+router.post('/getEncryptionKey', configController.getClientEncryptionKey);
 router.get('/system/pepper', configController.getSystemPepper);
 router.post('/scores', scoresController.postScore);
 router.get('/leaderboard', scoresController.getLeaderboard);
