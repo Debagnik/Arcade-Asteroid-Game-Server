@@ -75,7 +75,7 @@ To allow the server to securely read and append data to Google Sheets, you must 
 ### `POST /api/getEncryptionKey`
 - Protected route (Requires Bearer Token).
 - Expects: `{ "publicKey": "<Client RSA Public Key (PEM)>" }`.
-- Returns: `{ "encryptedAesKey": "<Base64 string>" }`. The client uses their RSA Private Key to decrypt this value, retrieving the server's 32-byte AES-256 session key.
+- Returns: `{ "encryptedAesKey": "<Base64 string>" }`. The server encrypts the key using your public key with **RSA_PKCS1_OAEP_PADDING** and the **SHA-1** hash function. The client uses their RSA Private Key to decrypt this value, retrieving the server's 32-byte AES-256 session key.
 
 ### `POST /api/scores?version=v1`
 - Protected route (Requires Bearer Token).
@@ -113,7 +113,7 @@ To correctly submit data to `/api/scores`, the client system must implement the 
 
 ### 2. Encryption Pipeline (Data Transmission)
 1. **Fetch Key**: Call `POST /api/getEncryptionKey` with the client's RSA Public Key and retrieve the Base64 RSA-encrypted AES key.
-2. **Decrypt Key**: Decrypt the received key using the client's RSA Private Key to obtain the raw 32-byte AES-256 key.
-3. **Encrypt Payload**: Generate a random 16-byte IV. Use AES-256-CBC to encrypt the assembled string from the Encoding Pipeline. Prepend the 16-byte IV to the ciphertext bytes.
+2. **Decrypt Key**: Decrypt the received key using the client's RSA Private Key (**using OAEP padding with SHA-1**) to obtain the raw 32-byte AES-256 key.
+3. **Encrypt Payload**: Generate a random 16-byte IV. Use AES-256-CBC (**with default PKCS#7 auto-padding enabled**) to encrypt the assembled string from the Encoding Pipeline. Prepend the 16-byte IV to the ciphertext bytes.
 4. **Base64 Encode Encrypted Payload**: Encode the concatenated `[IV + CipherText]` to a Base64 string.
 5. **Send Data**: Assign the resulting Base64 string to `gameScore` in the request body. Set `isEncrypted: true` and `isPeppered: true` (if pepper was used) and `version` query parameter. Retry up to 5 times if the server does not respond with status 201.
