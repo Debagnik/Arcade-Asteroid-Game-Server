@@ -106,10 +106,10 @@ To correctly submit data to `/api/scores`, the client system must implement the 
 1. **Compress**: Compress raw JSON string to bytes using LZMA2 (Preset 9 / Max).
 2. **Base64 Encode**: Encode compressed bytes to a base64 string.
 3. **Add Salt**: Append `SALT` ("privacy-apron-privacy-eternal-dominoes-approach") to the base64 string.
-4. **XOR Mask Config**: If using pepper, determine the `XOR_KEY` by appending the fetched pepper string to the base `XOR_KEY`. Otherwise, use the base `XOR_KEY` ("B4Y&%!*wZ5b!WRgVo#9EUB78").
+4. **XOR Mask Config**: If using pepper, determine the `XOR_KEY` by appending the fetched pepper string to the base `XOR_KEY`. Otherwise, use the base `XOR_KEY`
 5. **XOR Mask**: Convert the salted string to bytes, and XOR each byte against the `XOR_KEY` recursively.
 6. **Base64 Encode**: Encode the XOR'd bytes to a base64 string (`protectedData`).
-7. **Sign & Assemble**: Calculate the SHA-256 hash of `protectedData` (lowercase hex). Append `CHECKSUM_SEPARATOR` ("(>w<)") and the hash to `protectedData`.
+7. **Sign & Assemble**: Calculate the SHA-256 hash of `protectedData` (lowercase hex). Append `CHECKSUM_SEPARATOR` and the hash to `protectedData`.
 
 ### 2. Encryption Pipeline (Data Transmission)
 1. **Fetch Key**: Call `POST /api/getEncryptionKey` with the client's RSA Public Key and retrieve the Base64 RSA-encrypted AES key.
