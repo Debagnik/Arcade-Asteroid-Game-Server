@@ -1,18 +1,49 @@
 const { decodeAndVerifyScore, nameUUIDFromBytes } = require('../utils/crypto.util');
-const { SEED_SEPARATOR, MAX_SCORE_PER_MINUTE } = require('../config/constants');
+const { SEED_SEPARATOR, MAX_SCORE_PER_MINUTE, XOR_KEY } = require('../config/constants');
 const { getSheetData, appendSheetData, updateSheetData } = require('../services/googleSheets.service');
+const { decryptPayload } = require('../services/encryption.service');
 
 const postScore = async (req, res) => {
     try {
-        const { gameScore } = req.body;
+        const { version } = req.query;
+        let { gameScore, isPeppered, isEncrypted } = req.body;
+
         if (!gameScore) {
             return res.status(400).json({ error: 'Missing gameScore in request body.' });
+        }
+
+        // Decrypt payload if isEncrypted flag is true
+        if (isEncrypted === true) {
+            try {
+                gameScore = decryptPayload(gameScore);
+            } catch (err) {
+                return res.status(400).json({ error: `AES Decryption failed: ${err.message}` });
+            }
+        }
+
+        // Resolve dynamic XOR key if pepper is enabled and version is provided
+        let customXorKey = XOR_KEY;
+        if (version && isPeppered === true) {
+            const data = await getSheetData('Config!A:B');
+            let foundPepper = null;
+            if (data && data.length > 0) {
+                for (let i = 1; i < data.length; i++) {
+                    if (data[i] && data[i][0] === version) {
+                        foundPepper = data[i][1];
+                        break;
+                    }
+                }
+            }
+            if (!foundPepper) {
+                return res.status(404).json({ error: `Pepper version '${version}' not found.` });
+            }
+            customXorKey = XOR_KEY + foundPepper;
         }
 
         // 1. Decode and Verify Signature
         let decodedPayload;
         try {
-            decodedPayload = decodeAndVerifyScore(gameScore);
+            decodedPayload = await decodeAndVerifyScore(gameScore, customXorKey);
         } catch (error) {
             return res.status(400).json({ error: error.message || 'Signature verification failed.' });
         }
@@ -59,7 +90,8 @@ const postScore = async (req, res) => {
         }
 
         // 3. Update GlobalScores to maintain only the highest score per mode (Upsert)
-        if (highScores) {
+        // Conditional limitation: only update GlobalScores if the payload is AES encrypted
+        if (isEncrypted === true && highScores) {
             let existingScoresData = [];
             try {
                 existingScoresData = await getSheetData('GlobalScores!A:F') || [];
@@ -89,7 +121,7 @@ const postScore = async (req, res) => {
                         mode,
                         hs.score,
                         hs.scoredBy,
-                        hs.timestamp,
+                        hs.timestamp/1000,
                         hs.sessionId,
                         hs.highScoreId
                     ];
@@ -126,22 +158,22 @@ const postScore = async (req, res) => {
                 systemUUID,
                 metadata.playerOS || '',
                 metadata.totalTimePlayed || 0,
-                metadata.timestamp || '',
+                metadata.timestamp/1000 || '',
                 highScores?.TIME_BOUND?.score || 0,
                 highScores?.TIME_BOUND?.scoredBy || '',
                 highScores?.TIME_BOUND?.highScoreId || '',
                 highScores?.TIME_BOUND?.sessionId || '',
-                highScores?.TIME_BOUND?.timestamp || "null",
+                highScores?.TIME_BOUND?.timestamp/1000 || "null",
                 highScores?.ENDLESS?.score || 0,
                 highScores?.ENDLESS?.scoredBy || '',
                 highScores?.ENDLESS?.highScoreId || '',
                 highScores?.ENDLESS?.sessionId || '',
-                highScores?.ENDLESS?.timestamp || "null",
+                highScores?.ENDLESS?.timestamp/1000 || "null",
                 highScores?.CLASSIC?.score || 0,
                 highScores?.CLASSIC?.scoredBy || '',
                 highScores?.CLASSIC?.highScoreId || '',
                 highScores?.CLASSIC?.sessionId || '',
-                highScores?.CLASSIC?.timestamp || "null",
+                highScores?.CLASSIC?.timestamp/1000 || "null",
             ];
 
             if (pmRowIndex !== -1) {
@@ -176,7 +208,7 @@ const postScore = async (req, res) => {
                     session.mode || '',
                     session.score || 0,
                     session.timePlayed || 0,
-                    session.timestamp || 0,
+                    session.timestamp/1000 || "null",
                     metadata?.systemUUID || ''
                 ]);
                 existingSessionIds.add(session.sessionId); // avoid duplicates in same payload

@@ -18,7 +18,8 @@
     "express": "^5.2.1",
     "googleapis": "^171.4.0",
     "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "lzma-native": "^8.0.6"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
