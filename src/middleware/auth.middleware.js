@@ -15,6 +15,8 @@ const authMiddleware = (req, res, next) => {
         req.user = decoded; // Optional, useful if we have a valid payload
         next();
     } catch (error) {
+        console.error(`[Auth Middleware] Token verification failed:`, error.message);
+        console.error(`[Auth Middleware] Error stack:`, error.stack);
         return res.status(403).json({ error: 'Forbidden: Invalid or expired token' });
     }
 };

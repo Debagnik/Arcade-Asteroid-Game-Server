@@ -76,6 +76,8 @@ const decodeAndVerifyScore = async (fullPayload, customXorKey = XOR_KEY) => {
         });
         jsonString = decompressedBuffer.toString('utf-8');
     } catch (err) {
+        console.error(`[Crypto Util - decodeAndVerifyScore] Decompression error:`, err.message);
+        console.error(`[Crypto Util - decodeAndVerifyScore] Error stack:`, err.stack);
         throw new Error('Failed to decompress LZMA2 payload: ' + err.message);
     }
 
@@ -83,6 +85,8 @@ const decodeAndVerifyScore = async (fullPayload, customXorKey = XOR_KEY) => {
     try {
         return JSON.parse(jsonString);
     } catch (err) {
+        console.error(`[Crypto Util - decodeAndVerifyScore] JSON parse error:`, err.message);
+        console.error(`[Crypto Util - decodeAndVerifyScore] Error stack:`, err.stack);
         throw new Error('Failed to parse decompressed payload as JSON.');
     }
 };

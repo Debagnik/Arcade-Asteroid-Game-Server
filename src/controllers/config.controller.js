@@ -3,6 +3,7 @@ const { getEncryptedAesKey } = require('../services/encryption.service');
 
 const getSystemPepper = async (req, res) => {
     try {
+        console.log(`[Config API - getSystemPepper] Received request with query params:`, req.query);
         const { version } = req.query;
 
         if (!version) {
@@ -31,12 +32,15 @@ const getSystemPepper = async (req, res) => {
             return res.status(404).json({ error: `Version '${version}' not found in configuration.` });
         }
 
-        res.status(200).json({
+        const responseData = {
             version: version,
             pepper: foundPepper
-        });
+        };
+        console.log(`[Config API - getSystemPepper] Responding back with configuration data:`, responseData);
+        res.status(200).json(responseData);
     } catch (error) {
-        console.error('Error fetching system pepper:', error);
+        console.error(`[Config API - getSystemPepper] Error fetching system pepper:`, error.message);
+        console.error(`[Config API - getSystemPepper] Error stack:`, error.stack);
 
         // Distinguish between actual data missing vs GSheet API error
         if (error.message && error.message.includes('GOOGLE_SHEET_ID is not set')) {
@@ -49,6 +53,8 @@ const getSystemPepper = async (req, res) => {
 
 const getClientEncryptionKey = async (req, res) => {
     try {
+        console.log(`[Config API - getClientEncryptionKey] Received request to generate AES key.`);
+        console.log(`[Config API - getClientEncryptionKey] Received publicKey length:`, req.body.publicKey ? req.body.publicKey.length : 0);
         const { publicKey } = req.body;
 
         if (!publicKey || typeof publicKey !== 'string') {
@@ -56,9 +62,11 @@ const getClientEncryptionKey = async (req, res) => {
         }
 
         const encryptedAesKey = getEncryptedAesKey(publicKey);
+        console.log(`[Config API - getClientEncryptionKey] Responding back with encrypted AES key data. length:`, encryptedAesKey ? encryptedAesKey.length : 0);
         res.status(200).json({ encryptedAesKey });
     } catch (error) {
-        console.error('Error serving encryption key:', error);
+        console.error(`[Config API - getClientEncryptionKey] Error serving encryption key:`, error.message);
+        console.error(`[Config API - getClientEncryptionKey] Error stack:`, error.stack);
         res.status(400).json({ error: error.message || 'Failed to generate encrypted AES key.' });
     }
 };

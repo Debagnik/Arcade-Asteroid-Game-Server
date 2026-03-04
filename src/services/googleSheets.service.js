@@ -25,7 +25,8 @@ const getAuthClient = async () => {
         sheetsClient = google.sheets({ version: 'v4', auth: authClient });
         return sheetsClient;
     } catch (error) {
-        console.error('Failed to authenticate with Google Sheets API:', error);
+        console.error(`[Google Sheets Service] Failed to authenticate with Google Sheets API:`, error.message);
+        console.error(`[Google Sheets Service] Error stack:`, error.stack);
         throw error;
     }
 };
@@ -45,7 +46,8 @@ const getSheetData = async (range) => {
         });
         return response.data.values; // Returns array of arrays
     } catch (error) {
-        console.error(`Error reading data from range ${range}:`, error);
+        console.error(`[Google Sheets Service] Error reading data from range ${range}:`, error.message);
+        console.error(`[Google Sheets Service] Error stack:`, error.stack);
         throw error;
     }
 };
@@ -60,6 +62,7 @@ const appendSheetData = async (range, values) => {
 
     const client = await getAuthClient();
     try {
+        console.log(`[Google Sheets Service] Appending data to range ${range}, rows count:`, values ? values.length : 0, `data:`, values);
         const response = await client.spreadsheets.values.append({
             spreadsheetId: SPREADSHEET_ID,
             range: range,
@@ -71,7 +74,8 @@ const appendSheetData = async (range, values) => {
         });
         return response.data;
     } catch (error) {
-        console.error(`Error appending data to range ${range}:`, error);
+        console.error(`[Google Sheets Service] Error appending data to range ${range}:`, error.message);
+        console.error(`[Google Sheets Service] Error stack:`, error.stack);
         throw error;
     }
 };
@@ -86,6 +90,7 @@ const updateSheetData = async (range, values) => {
 
     const client = await getAuthClient();
     try {
+        console.log(`[Google Sheets Service] Updating data in range ${range}, rows count:`, values ? values.length : 0, `data:`, values);
         const response = await client.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
             range: range,
@@ -96,7 +101,8 @@ const updateSheetData = async (range, values) => {
         });
         return response.data;
     } catch (error) {
-        console.error(`Error updating data to range ${range}:`, error);
+        console.error(`[Google Sheets Service] Error updating data to range ${range}:`, error.message);
+        console.error(`[Google Sheets Service] Error stack:`, error.stack);
         throw error;
     }
 };

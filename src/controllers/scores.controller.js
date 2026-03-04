@@ -7,6 +7,8 @@ const postScore = async (req, res) => {
     try {
         const { version } = req.query;
         let { gameScore, isPeppered, isEncrypted } = req.body;
+        console.log(`[Scores API - postScore] Received request: version=${version}, isPeppered=${isPeppered}, isEncrypted=${isEncrypted}`);
+        console.log(`[Scores API - postScore] gameScore payload received length:`, gameScore ? gameScore.length : 0);
 
         if (!gameScore) {
             return res.status(400).json({ error: 'Missing gameScore in request body.' });
@@ -17,6 +19,8 @@ const postScore = async (req, res) => {
             try {
                 gameScore = decryptPayload(gameScore);
             } catch (err) {
+                console.error(`[Scores API - postScore] AES Decryption failed:`, err.message);
+                console.error(`[Scores API - postScore] AES Decryption error stack:`, err.stack);
                 return res.status(400).json({ error: `AES Decryption failed: ${err.message}` });
             }
         }
@@ -45,10 +49,15 @@ const postScore = async (req, res) => {
         try {
             decodedPayload = await decodeAndVerifyScore(gameScore, customXorKey);
         } catch (error) {
+            console.error(`[Scores API - postScore] Signature verification failed:`, error.message);
+            console.error(`[Scores API - postScore] Error stack:`, error.stack);
             return res.status(400).json({ error: error.message || 'Signature verification failed.' });
         }
 
         const { highScores, sessionHistory, metadata } = decodedPayload;
+
+        console.log(`[Scores API - postScore] Decoded payload metadata:`, metadata);
+        console.log(`[Scores API - postScore] Decoded payload sessionHistory count:`, sessionHistory ? sessionHistory.length : 0);
 
         if (!sessionHistory || !Array.isArray(sessionHistory)) {
             return res.status(400).json({ error: 'Invalid payload structure: missing sessionHistory.' });
@@ -96,6 +105,8 @@ const postScore = async (req, res) => {
             try {
                 existingScoresData = await getSheetData('GlobalScores!A:F') || [];
             } catch (e) {
+                console.error(`[Scores API - postScore] GlobalScores sheet read error:`, e.message);
+                console.error(`[Scores API - postScore] Error stack:`, e.stack);
                 console.log('GlobalScores sheet not found or empty, skipping reading existing data.');
             }
 
@@ -121,7 +132,7 @@ const postScore = async (req, res) => {
                         mode,
                         hs.score,
                         hs.scoredBy,
-                        hs.timestamp/1000,
+                        hs.timestamp / 1000,
                         hs.sessionId,
                         hs.highScoreId
                     ];
@@ -142,6 +153,8 @@ const postScore = async (req, res) => {
             try {
                 pmData = await getSheetData('PlayerMasterData!A:A') || [];
             } catch (e) {
+                console.error(`[Scores API - postScore] PlayerMasterData sheet read error:`, e.message);
+                console.error(`[Scores API - postScore] Error stack:`, e.stack);
                 console.log('PlayerMasterData sheet not found or empty, skipping reading existing data.');
             }
 
@@ -158,22 +171,22 @@ const postScore = async (req, res) => {
                 systemUUID,
                 metadata.playerOS || '',
                 metadata.totalTimePlayed || 0,
-                metadata.timestamp/1000 || '',
+                metadata.timestamp / 1000 || '',
                 highScores?.TIME_BOUND?.score || 0,
                 highScores?.TIME_BOUND?.scoredBy || '',
                 highScores?.TIME_BOUND?.highScoreId || '',
                 highScores?.TIME_BOUND?.sessionId || '',
-                highScores?.TIME_BOUND?.timestamp/1000 || "null",
+                highScores?.TIME_BOUND?.timestamp / 1000 || "null",
                 highScores?.ENDLESS?.score || 0,
                 highScores?.ENDLESS?.scoredBy || '',
                 highScores?.ENDLESS?.highScoreId || '',
                 highScores?.ENDLESS?.sessionId || '',
-                highScores?.ENDLESS?.timestamp/1000 || "null",
+                highScores?.ENDLESS?.timestamp / 1000 || "null",
                 highScores?.CLASSIC?.score || 0,
                 highScores?.CLASSIC?.scoredBy || '',
                 highScores?.CLASSIC?.highScoreId || '',
                 highScores?.CLASSIC?.sessionId || '',
-                highScores?.CLASSIC?.timestamp/1000 || "null",
+                highScores?.CLASSIC?.timestamp / 1000 || "null",
             ];
 
             if (pmRowIndex !== -1) {
@@ -188,6 +201,8 @@ const postScore = async (req, res) => {
         try {
             sdData = await getSheetData('sessionData!A:A') || [];
         } catch (e) {
+            console.error(`[Scores API - postScore] sessionData sheet read error:`, e.message);
+            console.error(`[Scores API - postScore] Error stack:`, e.stack);
             console.log('sessionData sheet not found or empty, skipping reading existing data.');
         }
 
@@ -208,7 +223,7 @@ const postScore = async (req, res) => {
                     session.mode || '',
                     session.score || 0,
                     session.timePlayed || 0,
-                    session.timestamp/1000 || "null",
+                    session.timestamp / 1000 || "null",
                     metadata?.systemUUID || ''
                 ]);
                 existingSessionIds.add(session.sessionId); // avoid duplicates in same payload
@@ -219,10 +234,13 @@ const postScore = async (req, res) => {
             await appendSheetData('sessionData!A:G', sessionRowsToAppend);
         }
 
-        return res.status(201).json({ message: 'All scores successfully verified and updated.' });
+        const responseData = { message: 'All scores successfully verified and updated.' };
+        console.log(`[Scores API - postScore] Responding back:`, responseData);
+        return res.status(201).json(responseData);
 
     } catch (error) {
-        console.error('Error posting score:', error);
+        console.error(`[Scores API - postScore] Error posting score:`, error.message);
+        console.error(`[Scores API - postScore] Error stack:`, error.stack);
 
         // Return 500 error if missing auth setup
         if (error.message && error.message.includes('GOOGLE_SHEET_ID is not set')) {
@@ -235,6 +253,7 @@ const postScore = async (req, res) => {
 
 const getLeaderboard = async (req, res) => {
     try {
+        console.log(`[Scores API - getLeaderboard] Received request to fetch leaderboard`);
         const data = await getSheetData('GlobalScores!A:F');
 
         // Mode -> { username, highestScore }
@@ -273,9 +292,11 @@ const getLeaderboard = async (req, res) => {
             }
         }
 
+        console.log(`[Scores API - getLeaderboard] Responding back with leaderboard:`, leaderboard);
         return res.status(200).json(leaderboard);
     } catch (error) {
-        console.error('Error fetching leaderboard:', error);
+        console.error(`[Scores API - getLeaderboard] Error fetching leaderboard:`, error.message);
+        console.error(`[Scores API - getLeaderboard] Error stack:`, error.stack);
         if (error.message && error.message.includes('GOOGLE_SHEET_ID is not set')) {
             return res.status(500).json({ error: 'Server configuration error: Google auth not setups properly' });
         }

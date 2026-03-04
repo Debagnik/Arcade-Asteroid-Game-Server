@@ -16,6 +16,8 @@ const getEncryptedAesKey = (clientPublicKey) => {
         );
         return encrypted.toString('base64');
     } catch (error) {
+        console.error(`[Encryption Service - getEncryptedAesKey] Error:`, error.message);
+        console.error(`[Encryption Service - getEncryptedAesKey] Error stack:`, error.stack);
         throw new Error('Failed to encrypt AES key with given public key. Ensure the key format is correct (PEM).');
     }
 };
@@ -44,6 +46,8 @@ const decryptPayload = (base64Payload) => {
 
         return decrypted;
     } catch (error) {
+        console.error(`[Encryption Service - decryptPayload] Error:`, error.message);
+        console.error(`[Encryption Service - decryptPayload] Error stack:`, error.stack);
         throw new Error(`Failed to decrypt AES payload: ${error.message}`);
     }
 };
